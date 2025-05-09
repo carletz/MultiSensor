@@ -1,0 +1,779 @@
+esphome:
+  name: "sensore_${area}_${stanza}".lower()  # es: sensore_piano4_studio
+  friendly_name: "Sensore ${area} ${stanza}"  # es: Sensore Piano4 Studio
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+substitutions:
+  area: "Piano4"          ## just for example, change at your use
+  stanza: "Studio"        ## just for example, change at your use
+
+ota:
+  - platform: esphome
+    password: ""
+
+ethernet:
+  type: W5500
+  clk_pin: GPIO43
+  mosi_pin: GPIO44
+  miso_pin: GPIO42
+  cs_pin: GPIO41
+  interrupt_pin: GPIO2
+  reset_pin: GPIO1
+  manual_ip:
+    static_ip: 192.168.1.69     ## just for example, change at your use
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+web_server:
+  port: 80
+  version: 3
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+mqtt:
+  broker: 192.168.1.42          ## just for example, change at your use
+  port: 1883
+
+i2c:
+  sda: GPIO08
+  scl: GPIO18
+  scan: true
+  frequency: 400kHz
+  id: bus_a
+
+uart:
+  tx_pin: GPIO16
+  rx_pin: GPIO15
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+ld2410:
+
+binary_sensor:
+  - platform: ld2410
+    has_target:
+      name: Presence
+      id: bs_presence
+      internal: false
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Presence"
+            payload: "ON"
+      on_release:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Presence"
+            payload: "OFF"
+    has_moving_target:
+      name: Moving Target
+      id: bs_moving
+      internal: false
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Moving_target"
+            payload: "ON"
+      on_release:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Moving_target"
+            payload: "OFF"
+    has_still_target:
+        name: Still Target
+        id: bs_still
+        internal: false
+        on_press:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Still_target"
+              payload: "ON"
+        on_release:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Still_target"
+              payload: "OFF"
+    out_pin_presence_status:
+      name: Out Pin Presence Status
+      id: bs_out_pin
+      internal: false
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Out_pin"
+            payload: "ON"
+      on_release:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Out_pin"
+            payload: "OFF"
+
+sensor:
+  - platform: bme280_i2c
+    temperature:
+      name: "BME280 Temperature"
+      id: bme280_temp
+      internal: true
+      oversampling: 16x    
+    pressure:
+      name: "BME280 Pressure"
+      id: bme280_press
+      internal: true
+    humidity:
+      name: "BME280 Humidity"
+      id: bme280_hum
+      internal: true
+    address: 0x76
+    i2c_id: bus_a
+    update_interval: 30s
+
+  - platform: template
+    name: "BME280 Temperatura"
+    id: bme280_temp_template
+    unit_of_measurement: "°C"
+    lambda: |-
+      return id(bme280_temp).state;
+    update_interval: 30s
+    state_topic: "${area}/${stanza}/Ambiente/Temperatura"
+  - platform: template
+    name: "BME280 Umidità"
+    id: bme280_hum_template
+    unit_of_measurement: "%"
+    lambda: |-
+      return id(bme280_hum).state;
+    update_interval: 30s
+    state_topic: "${area}/${stanza}/Ambiente/Umidita"
+  - platform: template
+    name: "BME280 Pressione"
+    id: bme280_press_template
+    unit_of_measurement: "hPa"
+    lambda: |-
+      return id(bme280_press).state;
+    update_interval: 30s
+    state_topic: "${area}/${stanza}/Ambiente/Pressione"
+
+  - platform: bh1750
+    name: "Luce BH1750"
+    id: lux_sens
+    internal: true
+    address: 0x23
+    i2c_id: bus_a
+    update_interval: 30s
+  - platform: template
+    name: "Luce BH1750"
+    id: lux_sens_template
+    unit_of_measurement: "lx"
+    lambda: |-
+      return id(lux_sens).state;
+    update_interval: 30s
+    state_topic: "${area}/${stanza}/Luce/Lux"
+
+  - platform: scd4x
+    co2:
+      name: "CO2 SCD41"
+      id: scd41_co2
+      internal: true
+    temperature:
+      name: "Temperatura SCD41"
+      id: scd41_temp
+      internal: true
+    humidity:
+      name: "Umidità SCD41"
+      id: scd41_hum
+      internal: true
+    update_interval: 60s
+    i2c_id: bus_a
+  - platform: template
+    name: "CO2 SCD41"
+    id: scd41_co2_template
+    unit_of_measurement: "ppm"
+    lambda: |-
+      return id(scd41_co2).state;
+    state_topic: "${area}/${stanza}/Aria/CO2"
+  - platform: template
+    name: "Temperatura SCD41"
+    id: scd41_temp_template
+    unit_of_measurement: "°C"
+    lambda: |-
+      return id(scd41_temp).state;
+    state_topic: "${area}/${stanza}/Aria/Temperatura"
+  - platform: template
+    name: "Umidità SCD41"
+    id: scd41_hum_template
+    unit_of_measurement: "%"
+    lambda: |-
+      return id(scd41_hum).state;
+    state_topic: "${area}/${stanza}/Aria/Umidita"
+
+  - platform: ld2410
+    light:
+      name: Light
+      id: ld_light
+      internal: true
+    moving_distance:
+      name : Moving Distance
+      id: ld_move_dist
+      internal: true
+    still_distance:
+      name: Still Distance
+      id: ld_still_dist
+      internal: true
+    moving_energy:
+      name: Move Energy
+      id: ld_move_energy
+      internal: true
+    still_energy:
+      name: Still Energy
+      id: ld_still_energy
+      internal: true
+    detection_distance:
+      name: Detection Distance
+      id: ld_detect_dist
+      internal: true
+    g0:
+      move_energy:
+        name: g0 move energy
+        id: g0_move_energy
+      still_energy:
+        name: g0 still energy
+        id: g0_still_energy
+    g1:
+      move_energy:
+        name: g1 move energy
+        id: g1_move_energy
+      still_energy:
+        name: g1 still energy
+        id: g1_still_energy
+    g2:
+      move_energy:
+        name: g2 move energy
+        id: g2_move_energy        
+      still_energy:
+        name: g2 still energy
+        id: g2_still_energy
+    g3:
+      move_energy:
+        name: g3 move energy
+        id: g3_move_energy
+      still_energy:
+        name: g3 still energy
+        id: g3_still_energy
+    g4:
+      move_energy:
+        name: g4 move energy
+        id: g4_move_energy
+      still_energy:
+        name: g4 still energy
+        id: g4_still_energy
+    g5:
+      move_energy:
+        name: g5 move energy
+        id: g5_move_energy
+      still_energy:
+        name: g5 still energy
+        id: g5_still_energy
+    g6:
+      move_energy:
+        name: g6 move energy
+        id: g6_move_energy
+      still_energy:
+        name: g6 still energy
+        id: g6_still_energy
+    g7:
+      move_energy:
+        name: g7 move energy
+        id: g7_move_energy
+      still_energy:
+        name: g7 still energy
+        id: g7_still_energy
+    g8:
+      move_energy:
+        name: g8 move energy
+        id: g8_move_energy
+      still_energy:
+        name: g8 still energy
+        id: g8_still_energy
+  - platform: template
+    name: "LD2410 Light"
+    id: ld_light_template
+    unit_of_measurement: "lx"
+    lambda: |-
+      return id(ld_light).state;
+    state_topic: "${area}/${stanza}/Presenza/Light"     
+  - platform: template
+    name: "Moving Distance"
+    id: ld_move_dist_template
+    unit_of_measurement: "cm"
+    lambda: |-
+      return id(ld_move_dist).state;
+    state_topic: "${area}/${stanza}/Presenza/Moving distance"       
+  - platform: template
+    name: "Still Distance"
+    id: ld_still_dist_template
+    unit_of_measurement: "cm"
+    lambda: |-
+      return id(ld_still_dist).state;
+    state_topic: "${area}/${stanza}/Presenza/Still distance"
+  - platform: template
+    name: "Move Energy"
+    id: ld_move_energy_template
+    lambda: |-
+      return id(ld_move_energy).state;
+    state_topic: "${area}/${stanza}/Presenza/Move energy"
+  - platform: template
+    name: "Still Energy"
+    id: ld_still_energy_template
+    lambda: |-
+      return id(ld_still_energy).state;
+    state_topic: "${area}/${stanza}/Presenza/Still energy"
+  - platform: template
+    name: "Detection Distance"
+    id: ld_detect_dist_template
+    unit_of_measurement: "cm"
+    lambda: |-
+      return id(ld_detect_dist).state;
+    state_topic: "${area}/${stanza}/Presenza/Detection distance"
+  - platform: template
+    name: "G0 Move Energy"
+    lambda: |-
+      return id(g0_move_energy).state;
+    id: g0_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G0/Move_Energy"
+  - platform: template
+    name: "G0 Still Energy"
+    lambda: |-
+      return id(g0_still_energy).state;
+    id: g0_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G0/Still_Energy"
+  - platform: template
+    name: "G1 Move Energy"
+    lambda: |-
+      return id(g1_move_energy).state;
+    id: g1_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G1/Move_Energy"
+  - platform: template
+    name: "G1 Still Energy"
+    lambda: |-
+      return id(g1_still_energy).state;
+    id: g1_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G1/Still_Energy"
+  - platform: template
+    name: "G2 Move Energy"
+    lambda: |-
+      return id(g2_move_energy).state;
+    id: g2_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G2/Move_Energy"
+  - platform: template
+    name: "G2 Still Energy"
+    lambda: |-
+      return id(g2_still_energy).state;
+    id: g2_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G2/Still_Energy"
+  - platform: template
+    name: "G3 Move Energy"
+    lambda: |-
+      return id(g3_move_energy).state;
+    id: g3_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G3/Move_Energy"
+  - platform: template
+    name: "G3 Still Energy"
+    lambda: |-
+      return id(g3_still_energy).state;
+    id: g3_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G3/Still_Energy"
+  - platform: template
+    name: "G4 Move Energy"
+    lambda: |-
+      return id(g4_move_energy).state;
+    id: g4_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G4/Move_Energy"
+  - platform: template
+    name: "G4 Still Energy"
+    lambda: |-
+      return id(g4_still_energy).state;
+    id: g4_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G4/Still_Energy"
+  - platform: template
+    name: "G5 Move Energy"
+    lambda: |-
+      return id(g5_move_energy).state;
+    id: g5_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G5/Move_Energy"
+  - platform: template
+    name: "G5 Still Energy"
+    lambda: |-
+      return id(g5_still_energy).state;
+    id: g5_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G5/Still_Energy"
+  - platform: template
+    name: "G6 Move Energy"
+    lambda: |-
+      return id(g6_move_energy).state;
+    id: g6_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G6/Move_Energy"
+  - platform: template
+    name: "G6 Still Energy"
+    lambda: |-
+      return id(g6_still_energy).state;
+    id: g6_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G6/Still_Energy"
+  - platform: template
+    name: "G7 Move Energy"
+    lambda: |-
+      return id(g7_move_energy).state;
+    id: g7_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G7/Move_Energy"
+  - platform: template
+    name: "G7 Still Energy"
+    lambda: |-
+      return id(g7_still_energy).state;
+    id: g7_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G7/Still_Energy"
+  - platform: template
+    name: "G8 Move Energy"
+    lambda: |-
+      return id(g8_move_energy).state;
+    id: g8_move_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G8/Move_Energy"
+  - platform: template
+    name: "G8 Still Energy"
+    lambda: |-
+      return id(g8_still_energy).state;
+    id: g8_still_energy_template
+    state_topic: "${area}/${stanza}/Presenza/G8/Still_Energy"
+
+  - platform: internal_temperature
+    name: ESP Temperature
+    id: esp_temp
+    internal: true
+    unit_of_measurement: °C
+    device_class: TEMPERATURE
+    update_interval: 30s
+    entity_category: "diagnostic"
+  - platform: template
+    name: "ESP Temperature"
+    id: esp_temp_template
+    unit_of_measurement: "°C"
+    lambda: |-
+      return id(esp_temp).state;
+    update_interval: 60s
+    state_topic: "${area}/${stanza}/Diagnostica/Esp temperatura"
+    
+  - platform: uptime
+    name: Uptime
+    id: sys_uptime
+    update_interval: 10s
+  - platform: template
+    name: "Uptime"
+    id: uptime_sensor_template
+    unit_of_measurement: "s"
+    lambda: |-
+      return id(sys_uptime).state;
+    update_interval: 10s
+    state_topic: "${area}/${stanza}/Diagnostica/Uptime"
+
+switch:
+  - platform: ld2410
+    engineering_mode:
+      name: "LD2410 Engineering Mode"
+      id: engineering_mode
+      on_turn_on:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Engineering Mode"
+            payload: "ON"
+      on_turn_off:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Engineering Mode"
+            payload: "OFF"
+    bluetooth:
+      name: "LD2410 Bluetooth"
+      id: bluetooth
+      on_turn_on:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Bluetooth"
+            payload: "ON"
+      on_turn_off:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Bluetooth"
+            payload: "OFF"
+
+remote_transmitter:
+  pin: GPIO4
+  carrier_duty_percent: 50%
+
+number:
+  - platform: ld2410
+    timeout:
+      name: Timeout
+      id: timeout
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Timeout"
+            payload: !lambda 'return to_string(x);'
+    light_threshold:
+      name: Light Threshold
+      id: light_threshold
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Light Threshold"
+            payload: !lambda 'return to_string(x);'      
+    max_move_distance_gate:
+      name: Max Move Distance Gate
+      id: max_move_distance_gate
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Max Move Distance"
+            payload: !lambda 'return to_string(x);'      
+    max_still_distance_gate:
+      name: Max Still Distance Gate
+      id: max_still_distance_gate
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Max Still Distance"
+            payload: !lambda 'return to_string(x);'      
+    g0:
+      move_threshold:
+        name: g0 move threshold
+        id: g0_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G0/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g0 still threshold
+        id: g0_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G0/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g1:
+      move_threshold:
+        name: g1 move threshold
+        id: g1_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G1/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g1 still threshold
+        id: g1_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G1/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g2:
+      move_threshold:
+        name: g2 move threshold
+        id: g2_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G2/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g2 still threshold
+        id: g2_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G2/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g3:
+      move_threshold:
+        name: g3 move threshold
+        id: g3_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G3/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g3 still threshold
+        id: g3_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G3/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g4:
+      move_threshold:
+        name: g4 move threshold
+        id: g4_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G4/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g4 still threshold
+        id: g4_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G4/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g5:
+      move_threshold:
+        name: g5 move threshold
+        id: g5_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G5/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g5 still threshold
+        id: g5_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G5/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g6:
+      move_threshold:
+        name: g6 move threshold
+        id: g6_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G6/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g6 still threshold
+        id: g6_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G6/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g7:
+      move_threshold:
+        name: g7 move threshold
+        id: g7_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G7/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g7 still threshold
+        id: g7_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G7/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+    g8:
+      move_threshold:
+        name: g8 move threshold
+        id: g8_move_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G8/Move Threshold"
+              payload: !lambda 'return to_string(x);'
+      still_threshold:
+        name: g8 still threshold
+        id: g8_still_threshold
+        on_value:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Presenza/Parametri/G8/Still Threshold"
+              payload: !lambda 'return to_string(x);'
+
+button:
+  - platform: ld2410
+    factory_reset:
+      name: "LD2410 Factory Reset"
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Reset"
+            payload: "PRESSED"
+    restart:
+      name: "LD2410 Reboot"
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Reboot"
+            payload: "PRESSED"
+    query_params:
+      name: "LD2410 Query Params"
+      on_press:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Query"
+            payload: "PRESSED"
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "ESP Reboot"
+    on_press:
+      - mqtt.publish:
+          topic: "${area}/${stanza}/Diagnostica/ESP_Reboot"
+          payload: "PRESSED"
+
+  - platform: template
+    name: "Accendi TV"
+    on_press:
+      - remote_transmitter.transmit_nec:
+          address: 0x10EF
+          command: 0xA25D
+          repeat:
+            times: 3
+            wait_time: 40ms    
+      - mqtt.publish:
+          topic: "${area}/${stanza}/IR/Accendi_TV"
+          payload: "PRESSED"      
+
+select:
+  - platform: ld2410
+    distance_resolution:
+      name: Distance Resolution
+      id: distance_resolution
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Distance Resolution"
+            payload: !lambda 'return x;'      
+    baud_rate:
+      name: Baud Rate
+      id: baud_rate
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Baud Rate"
+            payload: !lambda 'return x;'      
+    light_function:
+      name: Light Function
+      id: light_function
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Light Function"
+            payload: !lambda 'return x;'      
+    out_pin_level:
+      name: Out Pin Level
+      id: out_pin_level
+      on_value:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Presenza/Parametri/Out Pin Level"
+            payload: !lambda 'return x;'      
+
+# Text sensors with general information.
+text_sensor:
+  # Expose ESPHome version as sensor.
+  - platform: version
+    name: "${area} ${stanza} Versione"
+    id: versione_esphome
+    on_value:
+      then:
+        - mqtt.publish:
+            topic: "${area}/${stanza}/Diagnostica/Versione"
+            payload: !lambda 'return x;'
+
+  # Expose WiFi information as sensors
+  - platform: ethernet_info
+    ip_address:
+      name: "${area} ${stanza} IP"
+      id: ip_address
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Diagnostica/IP"
+              payload: !lambda 'return x;'
+    dns_address:
+      name: "${area} ${stanza} DNS"
+      id: dns_address
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Diagnostica/DNS"
+              payload: !lambda 'return x;'
+    mac_address:
+      name: "${area} ${stanza} MAC"
+      id: mac_address    
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: "${area}/${stanza}/Diagnostica/MAC"
+              payload: !lambda 'return x;'    
