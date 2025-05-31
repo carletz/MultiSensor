@@ -33,6 +33,11 @@ Below is a 3D render of the custom MultiSensor PCB, including:
 ![3D Render of the MultiSensor Board](Hardware/3D_MultiSensor_2025-05-07.png)
 
 ---
+## 🎥 Demo Video
+
+[![Watch the video](https://img.youtube.com/vi/1dLpgVjPY0A/0.jpg)](https://www.youtube.com/watch?v=1dLpgVjPY0A)
+
+---
 ## 📡 Firmware
 
 The board runs on **ESPHome**, fully integrated with:
